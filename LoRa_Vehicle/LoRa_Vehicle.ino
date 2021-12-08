@@ -17,9 +17,9 @@ int distance = 0;
 #define ANT_MTR_1       14
 #define ANT_MTR_2       15
 
-#define RED_PIN         10
-#define GRN_PIN         11
-#define BLU_PIN         12
+#define RED_PIN         5
+#define GRN_PIN         6
+#define BLU_PIN         9
 
 byte RED_PWM = 0;
 byte GRN_PWM = 0;
@@ -29,7 +29,7 @@ void setup()
 {
 #ifdef DEBUG_ENABLE
   Serial.begin(115200);
-  while (!Serial) ; // Wait for serial port to be available
+  //while (!Serial) ; // Wait for serial port to be available
 #endif
 
   LoRa_Setup();
@@ -71,21 +71,18 @@ void loop()
     debugln("Red PWM Increment");
     // Increment Red by 64
     RED_PWM = (RED_PWM + 64) % 256;
-    analogWrite(RED_PIN, RED_PWM);
   }
   else if (strcmp((char*)action, "G++") == 0)
   {
     debugln("Green PWM Increment");
     // Increment Green by 64
     RED_PWM = (GRN_PWM + 64) % 256;
-    analogWrite(GRN_PIN, GRN_PWM);
   }
   else if (strcmp((char*)action, "B++") == 0)
   {
     debugln("Blue PWM Increment");
     // Increment Blue by 64
     RED_PWM = (BLU_PWM + 64) % 256;
-    analogWrite(BLU_PIN, BLU_PWM);
   }
   delay(20);
 }
@@ -96,7 +93,9 @@ void triggerAntenna()
   //byte open = digitalRead(OPEN_LMT_SW);
   if (digitalRead(OPEN_LMT_SW) == LOW)   // Clossing antenna assembly
   {
+    RGB_OFF();
     closeAnt();
+    foldAnt();
   }
   else            //if(close==HIGH) Opening Antenna Asembly
   {
@@ -104,8 +103,24 @@ void triggerAntenna()
     if (checkClearance()) // If clear then open antenna
     {
       unfoldAnt();
+      RGB_ON();
+      openAnt();
     }
   }
+}
+
+void RGB_ON()
+{
+  analogWrite(RED_PIN, RED_PWM);
+  analogWrite(GRN_PIN, GRN_PWM);
+  analogWrite(BLU_PIN, BLU_PWM);
+}
+
+void RGB_OFF()
+{
+  analogWrite(RED_PIN, 0);
+  analogWrite(GRN_PIN, 0);
+  analogWrite(BLU_PIN, 0);
 }
 
 void openAnt()
@@ -126,7 +141,6 @@ void closeAnt()
   delay(5000);
   digitalWrite(ANT_MTR_1, LOW);
   digitalWrite(ANT_MTR_2, LOW);
-  foldAnt();
 }
 
 void unfoldAnt()
@@ -159,7 +173,6 @@ void stopUnfolding()
   debugln("stop Unfolding Antenna");
   digitalWrite(FOLD_MTR_1, LOW);
   digitalWrite(FOLD_MTR_2, LOW);
-  openAnt();
 }
 
 bool checkClearance()

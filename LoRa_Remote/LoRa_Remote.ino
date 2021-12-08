@@ -18,7 +18,7 @@ void setup()
 
 #ifdef DEBUG_ENABLE
   Serial.begin(9600);
-  while (!Serial) ; // Wait for serial port to be available
+  //while (!Serial) ; // Wait for serial port to be available
 #endif
 
   LoRa_Setup();
