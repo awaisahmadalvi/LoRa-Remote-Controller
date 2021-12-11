@@ -5,7 +5,11 @@
 
 byte BUILTIN_LED = 13;
 
-byte ANT_BTN = 9;
+byte OPEN_ANT_LED = 14;
+byte CLOSE_ANT_LED = 15;
+
+byte OPEN_ANT_BTN = 6;  //check available pin
+byte CLOSE_ANT_BTN = 5;
 
 byte RED_BTN = 10;
 byte GRN_BTN = 11;
@@ -13,88 +17,152 @@ byte BLU_BTN = 12;
 
 bool IN_ISR = false;
 
+uint8_t * actSend, * actRecv;
+char OPEN_ACT[] = "ANT_Open_Send";
+char CLOSE_ACT[] = "ANT_Close_Send";
+uint8_t R__[] = "R++";
+uint8_t G__[] = "G++";
+uint8_t B__[] = "B++";
+
+unsigned long prevMillis;
+
 void setup()
 {
-
 #ifdef DEBUG_ENABLE
-  Serial.begin(9600);
+  Serial.begin(115200);
   //while (!Serial) ; // Wait for serial port to be available
 #endif
 
   LoRa_Setup();
 
-
   pinMode(BUILTIN_LED, OUTPUT);
   digitalWrite(BUILTIN_LED, HIGH);
 
-  pinMode(ANT_BTN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(ANT_BTN), ANT_BTN_ACT, FALLING );
+  pinMode(OPEN_ANT_LED, OUTPUT);
+  pinMode(CLOSE_ANT_LED, OUTPUT);
+  digitalWrite(OPEN_ANT_LED, LOW);
+  digitalWrite(CLOSE_ANT_LED, LOW);
+
+  pinMode(OPEN_ANT_BTN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(OPEN_ANT_BTN), ANT_Open_Send, FALLING );
+
+  pinMode(CLOSE_ANT_BTN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(CLOSE_ANT_BTN), ANT_Close_Send, FALLING );
 
   pinMode(RED_BTN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(RED_BTN), RED_BTN_ACT, FALLING );
+  attachInterrupt(digitalPinToInterrupt(RED_BTN), RED_Btn_Send, FALLING );
 
   pinMode(GRN_BTN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(GRN_BTN), GRN_BTN_ACT, FALLING );
+  attachInterrupt(digitalPinToInterrupt(GRN_BTN), GRN_Btn_Send, FALLING );
 
   pinMode(BLU_BTN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(BLU_BTN), BLU_BTN_ACT, FALLING );
+  attachInterrupt(digitalPinToInterrupt(BLU_BTN), BLU_Btn_Send, FALLING );
 }
-
-uint8_t * action;
-char trigger[] = "trigger";
-uint8_t R__[] = "R++";
-uint8_t G__[] = "G++";
-uint8_t B__[] = "B++";
 
 void loop()
 {
   if (IN_ISR)
   {
-    LoRa_Send(action);
+    LoRa_Send(actSend);
     IN_ISR = false;
   }
+
+  //actRecv = 0;
+  actRecv = LoRa_Read();
+  //debug("return: ");
+  //debugln((char*)actRecv);
+
+  if (strcmp((char*)actRecv , "") == 0)
+    return;
+  else if (strcmp((char*)actRecv , "OPEN_ACK") == 0)
+  {
+    debugln("LoRa RECV: OPEN_ACK");
+    Set_Open_LED();
+  }
+  else if (strcmp((char*)actRecv , "CLOSE_ACK") == 0)
+  {
+    debugln("LoRa RECV: CLOSE_ACK");
+    Set_Close_LED();
+  }
+  
+  if (prevMillis != 0)
+    if (prevMillis - millis() >= 10000)
+    {
+      prevMillis = 0;
+      digitalWrite(OPEN_ANT_LED, LOW);
+      digitalWrite(CLOSE_ANT_LED, LOW);
+    }
   delay(20);
 }
 
-
-void ANT_BTN_ACT() {
-  if (IN_ISR)
-    return;
-  IN_ISR = true;
-  debugln("ANT_BTN_ACT");
-  digitalWrite(BUILTIN_LED, LOW);
-  action = (uint8_t *)trigger;
-  digitalWrite(BUILTIN_LED, HIGH);
-  debugln("ANT_BTN_ACT_EXIT");
+void Set_Open_LED()
+{
+  prevMillis = millis();
+  digitalWrite(OPEN_ANT_LED, HIGH);
 }
 
-void RED_BTN_ACT() {
-  if (IN_ISR)
-    return;
-  IN_ISR = true;
-  debugln("RED_BTN_ACT");
-  digitalWrite(BUILTIN_LED, LOW);
-  action = (uint8_t *)R__;
-  digitalWrite(BUILTIN_LED, HIGH);
-  debugln("RED_BTN_ACT_EXIT");
+void Set_Close_LED()
+{
+  prevMillis = millis();
+  digitalWrite(CLOSE_ANT_LED, HIGH);
 }
-void GRN_BTN_ACT() {
+
+void ANT_Open_Send()
+{
   if (IN_ISR)
     return;
   IN_ISR = true;
-  debugln("GRN_BTN_ACT");
+  debugln("ANT_Open_Send");
   digitalWrite(BUILTIN_LED, LOW);
-  action = (uint8_t *)G__;
+  actSend = (uint8_t *)OPEN_ACT;
   digitalWrite(BUILTIN_LED, HIGH);
-  debugln("GRN_BTN_ACT_EXIT");
+  debugln("ANT_Open_Send_EXIT");
 }
-void BLU_BTN_ACT() {
+
+void ANT_Close_Send()
+{
   if (IN_ISR)
     return;
   IN_ISR = true;
-  debugln("BLU_BTN_ACT");
+  debugln("ANT_Close_Send");
   digitalWrite(BUILTIN_LED, LOW);
-  action = (uint8_t *)B__;
+  actSend = (uint8_t *)CLOSE_ACT;
   digitalWrite(BUILTIN_LED, HIGH);
-  debugln("BLU_BTN_ACT_EXIT");
+  debugln("ANT_Close_Send_EXIT");
+}
+
+void RED_Btn_Send()
+{
+  if (IN_ISR)
+    return;
+  IN_ISR = true;
+  debugln("RED_Btn_Send");
+  digitalWrite(BUILTIN_LED, LOW);
+  actSend = (uint8_t *)R__;
+  digitalWrite(BUILTIN_LED, HIGH);
+  debugln("RED_Btn_Send_EXIT");
+}
+
+void GRN_Btn_Send()
+{
+  if (IN_ISR)
+    return;
+  IN_ISR = true;
+  debugln("GRN_Btn_Send");
+  digitalWrite(BUILTIN_LED, LOW);
+  actSend = (uint8_t *)G__;
+  digitalWrite(BUILTIN_LED, HIGH);
+  debugln("GRN_Btn_Send_EXIT");
+}
+
+void BLU_Btn_Send()
+{
+  if (IN_ISR)
+    return;
+  IN_ISR = true;
+  debugln("BLU_Btn_Send");
+  digitalWrite(BUILTIN_LED, LOW);
+  actSend = (uint8_t *)B__;
+  digitalWrite(BUILTIN_LED, HIGH);
+  debugln("BLU_Btn_Send_EXIT");
 }

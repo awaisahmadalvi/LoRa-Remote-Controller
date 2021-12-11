@@ -51,3 +51,41 @@ uint8_t* LoRa_Read()
   }
   return (uint8_t*)"";
 }
+
+int LoRa_Send(uint8_t * data)
+{
+  // Send a message to manager_server
+  if (manager.sendtoWait(data, sizeof(data) * 2, VEHICLE_ADDRESS))
+  {
+    
+    debug("Sending: ");
+    debug((char*)data);
+    debug(" : ");
+    debugln(sizeof(data) * 2);
+
+    // Now wait for a reply from the server
+    uint8_t len = sizeof(buf) * 2;
+    uint8_t from;
+    if (manager.recvfromAckTimeout(buf, &len, 2000, &from))
+    {
+      debug("Remote: got reply from : 0x");
+      debug(from, 0); // HEX);
+      debug(": ");
+      debugln((char*)buf);
+      if ((char*)buf == "ACK")
+        return 0;
+      else
+        return 1;
+    }
+    else
+    {
+      debugln("No reply, is rf95_reliable_datagram_server running?");
+      return 2;
+    }
+  }
+  else
+  {
+    debugln("sendtoWait failed");
+    return -1;
+  }
+}

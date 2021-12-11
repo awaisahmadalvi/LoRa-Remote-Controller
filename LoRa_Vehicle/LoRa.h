@@ -12,6 +12,6 @@
 
 void LoRa_Setup();
 uint8_t* LoRa_Read();
-
+int LoRa_Send(uint8_t * data);
 
 #endif

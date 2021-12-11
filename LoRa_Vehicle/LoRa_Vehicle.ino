@@ -5,7 +5,8 @@
 #define DEBUG_ENABLE
 
 //Ultrasonic sensor
-#define ANT_HEIGHT 100
+#define ANT_OPEN_TIME 7500
+#define ANT_HEIGHT 140
 int distance = 0;
 
 #define OPEN_LMT_SW     18
@@ -25,6 +26,8 @@ byte RED_PWM = 0;
 byte GRN_PWM = 0;
 byte BLU_PWM = 0;
 
+uint8_t *actRecv, *actSend;
+
 void setup()
 {
 #ifdef DEBUG_ENABLE
@@ -36,10 +39,10 @@ void setup()
   US_setup();
 
   pinMode(OPEN_LMT_SW, INPUT_PULLUP);
-  //attachInterrupt(digitalPinToInterrupt(OPEN_LMT_SW), stopUnfolding, FALLING );
+  attachInterrupt(digitalPinToInterrupt(OPEN_LMT_SW), Stop_Folding, FALLING );
 
   pinMode(CLOSE_LMT_SW, INPUT_PULLUP);
-  //attachInterrupt(digitalPinToInterrupt(CLOSE_LMT_SW), stopFolding, FALLING );
+  attachInterrupt(digitalPinToInterrupt(CLOSE_LMT_SW), Stop_Folding, FALLING );
 
   pinMode(FOLD_MTR_1, OUTPUT);
   pinMode(FOLD_MTR_2, OUTPUT);
@@ -51,62 +54,88 @@ void setup()
   pinMode(GRN_PIN, OUTPUT);
   pinMode(BLU_PIN, OUTPUT);
 }
-uint8_t* action;
+
 void loop()
 {
-  //action = 0;
-  action = LoRa_Read();
-  //debug("return: ");
-  //debugln((char*)action);
-
-  if (strcmp((char*)action, "") == 0)
-    return;
-  if (strcmp((char*)action, "trigger") == 0)
-  {
-    debugln("IN TRIGGER");
-    triggerAntenna();
-  }
-  else if (strcmp((char*)action, "R++") == 0)
-  {
-    debugln("Red PWM Increment");
-    // Increment Red by 64
-    RED_PWM = (RED_PWM + 64) % 256;
-  }
-  else if (strcmp((char*)action, "G++") == 0)
-  {
-    debugln("Green PWM Increment");
-    // Increment Green by 64
-    RED_PWM = (GRN_PWM + 64) % 256;
-  }
-  else if (strcmp((char*)action, "B++") == 0)
-  {
-    debugln("Blue PWM Increment");
-    // Increment Blue by 64
-    RED_PWM = (BLU_PWM + 64) % 256;
-  }
+  Check_Action();
   delay(20);
 }
 
-void triggerAntenna()
+void Check_Action()
+{
+  //action = 0;
+  actRecv = LoRa_Read();
+  //debug("return: ");
+  //debugln((char*)actRecv);
+
+  if (strcmp((char*)actRecv, "") == 0)
+    return;
+  else if (strcmp((char*)actRecv, "ANT_OPEN") == 0)
+  {
+    debugln("LoRa RECV: ant_open");
+    Uncoil_Antenna();
+  }
+  else if (strcmp((char*)actRecv, "ANT_CLOSE") == 0)
+  {
+    debugln("LoRa RECV: ant_close");
+    Coil_Antenna();
+  }
+  else if (strcmp((char*)actRecv, "R++") == 0)
+  {
+    debugln("LoRa RECV: Red PWM Increment");
+    // Increment Red by 64
+    RED_PWM = (RED_PWM + 64) % 256;
+    RGB_ON();
+  }
+  else if (strcmp((char*)actRecv, "G++") == 0)
+  {
+    debugln("LoRa RECV: Green PWM Increment");
+    // Increment Green by 64
+    RED_PWM = (GRN_PWM + 64) % 256;
+    RGB_ON();
+  }
+  else if (strcmp((char*)actRecv, "B++") == 0)
+  {
+    debugln("LoRa RECV: Blue PWM Increment");
+    // Increment Blue by 64
+    RED_PWM = (BLU_PWM + 64) % 256;
+    RGB_ON();
+  }
+}
+
+void Uncoil_Antenna()
+{
+  //byte close = digitalRead(CLOSE_LMT_SW);
+  //byte open = digitalRead(OPEN_LMT_SW);
+  if (digitalRead(CLOSE_LMT_SW) == LOW) //Opening Antenna Asembly
+  {
+    /* Check Antenna Clearance */
+    if (Check_Clearance()) // If clear then open antenna
+    {
+      Open_LoRa_Send();
+      Unfold_Ant();
+      RGB_ON();
+      Uncoil_Ant();
+    }
+  }
+  else if (digitalRead(OPEN_LMT_SW) == LOW) //Opening Antenna Asembly
+  {
+    Open_LoRa_Send();
+  }
+
+}
+
+void Coil_Antenna()
 {
   //byte close = digitalRead(CLOSE_LMT_SW);
   //byte open = digitalRead(OPEN_LMT_SW);
   if (digitalRead(OPEN_LMT_SW) == LOW)   // Clossing antenna assembly
   {
+    Coil_Ant();
     RGB_OFF();
-    closeAnt();
-    foldAnt();
+    Fold_Ant();
   }
-  else            //if(close==HIGH) Opening Antenna Asembly
-  {
-    /* Check Antenna Clearance */
-    if (checkClearance()) // If clear then open antenna
-    {
-      unfoldAnt();
-      RGB_ON();
-      openAnt();
-    }
-  }
+  Close_LoRa_Send();
 }
 
 void RGB_ON()
@@ -123,59 +152,59 @@ void RGB_OFF()
   analogWrite(BLU_PIN, 0);
 }
 
-void openAnt()
+void Uncoil_Ant()
 {
   debugln("Uncoiling Antenna");
   digitalWrite(ANT_MTR_1, HIGH);
   digitalWrite(ANT_MTR_2, LOW);
-  delay(5000);
+  delay(ANT_OPEN_TIME);
   digitalWrite(ANT_MTR_1, LOW);
   digitalWrite(ANT_MTR_2, LOW);
 }
 
-void closeAnt()
+void Coil_Ant()
 {
   debugln("Coiling Antenna");
   digitalWrite(ANT_MTR_1, LOW);
   digitalWrite(ANT_MTR_2, HIGH);
-  delay(5000);
+  delay(ANT_OPEN_TIME);
   digitalWrite(ANT_MTR_1, LOW);
   digitalWrite(ANT_MTR_2, LOW);
 }
 
-void unfoldAnt()
-{
-  debugln("Unfolding Antenna");
-  digitalWrite(FOLD_MTR_1, HIGH);
-  digitalWrite(FOLD_MTR_2, LOW);
-  while (digitalRead(OPEN_LMT_SW) == HIGH);
-  stopUnfolding();
-}
-
-void foldAnt()
+void Fold_Ant()
 {
   debugln("Folding Antenna");
   digitalWrite(FOLD_MTR_1, LOW);
   digitalWrite(FOLD_MTR_2, HIGH);
-  while (digitalRead(CLOSE_LMT_SW) == HIGH);
-  stopFolding();
+  //while (digitalRead(CLOSE_LMT_SW) == HIGH);
+  //Stop_Folding();
 }
 
-void stopFolding()
+void Unfold_Ant()
 {
-  debugln("Stop Folding Antenna");
+  debugln("Unfolding Antenna");
+  digitalWrite(FOLD_MTR_1, HIGH);
+  digitalWrite(FOLD_MTR_2, LOW);
+  //while (digitalRead(OPEN_LMT_SW) == HIGH);
+  //Stop_Unfolding();
+}
+
+void Stop_Folding()
+{
+  debugln("Stop Folding/unfolding Antenna");
   digitalWrite(FOLD_MTR_1, LOW);
   digitalWrite(FOLD_MTR_2, LOW);
 }
-
-void stopUnfolding()
-{
+/*
+  void Stop_Unfolding()
+  {
   debugln("stop Unfolding Antenna");
   digitalWrite(FOLD_MTR_1, LOW);
   digitalWrite(FOLD_MTR_2, LOW);
-}
-
-bool checkClearance()
+  }
+*/
+bool Check_Clearance()
 {
   //return true;
   debugln("Checking Antenna Clearance");
@@ -186,4 +215,16 @@ bool checkClearance()
   if (distance >= ANT_HEIGHT)
     return true;
   return false;
+}
+
+void Open_LoRa_Send()
+{
+  actSend = (uint8_t *) "OPEN_ACK";
+  LoRa_Send(actSend);
+}
+
+void Close_LoRa_Send()
+{
+  actSend = (uint8_t *) "CLOSE_ACK";
+  LoRa_Send(actSend);
 }

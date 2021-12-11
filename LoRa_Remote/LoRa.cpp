@@ -11,6 +11,8 @@ RHReliableDatagram manager(driver, REMOTE_ADDRESS);
 // Dont put this on the stack:
 uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
 
+uint8_t ack[] = "ACK";
+
 void LoRa_Setup()
 {
   if (!manager.init())
@@ -58,4 +60,32 @@ int LoRa_Send(uint8_t * data)
     debugln("sendtoWait failed");
     return -1;
   }
+}
+
+
+uint8_t* LoRa_Read()
+{
+  if (manager.available())
+  {
+    // Wait for a message addressed to us from the client
+    uint8_t len = sizeof(buf);
+    uint8_t from;
+    if (manager.recvfromAck(buf, &len, &from))
+    {
+      debug("Vehicle: got request from : 0x");
+      debug(from, 0); //, HEX);
+      debug(": ");
+      debug((char*)buf);
+      debug(" : ");
+      debugln(len, 0);
+
+      // Send a reply back to the originator client
+      if (!manager.sendtoWait(ack, sizeof(ack) * 2, from))
+        debugln("sendtoWait failed");
+
+
+      return buf;
+    }
+  }
+  return (uint8_t*)"";
 }
