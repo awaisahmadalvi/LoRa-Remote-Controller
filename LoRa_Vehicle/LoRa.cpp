@@ -1,5 +1,3 @@
-
-
 #include "LoRa.h"
 #include "debug.h"
 
@@ -55,11 +53,13 @@ uint8_t* LoRa_Read()
 int LoRa_Send(uint8_t * data)
 {
   // Send a message to manager_server
-  if (manager.sendtoWait(data, sizeof(data) * 2, VEHICLE_ADDRESS))
+  if (manager.sendtoWait(data, sizeof(data) * 2, REMOTE_ADDRESS))
   {
     
     debug("Sending: ");
     debug((char*)data);
+    debug(" : to: 0x");
+    debug(REMOTE_ADDRESS,0);
     debug(" : ");
     debugln(sizeof(data) * 2);
 

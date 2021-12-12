@@ -18,8 +18,8 @@ byte BLU_BTN = 12;
 bool IN_ISR = false;
 
 uint8_t * actSend, * actRecv;
-char OPEN_ACT[] = "ANT_Open_Send";
-char CLOSE_ACT[] = "ANT_Close_Send";
+char OPEN_ACT[] = "ANT_OPEN";
+char CLOSE_ACT[] = "ANT_CLOS";
 uint8_t R__[] = "R++";
 uint8_t G__[] = "G++";
 uint8_t B__[] = "B++";
@@ -67,7 +67,22 @@ void loop()
     IN_ISR = false;
   }
 
-  //actRecv = 0;
+  Check_Action();
+
+  if (prevMillis != 0)
+    if (millis() - prevMillis >= 10000)
+    {
+      debugln("powering off LEDs");
+      prevMillis = 0;
+      digitalWrite(OPEN_ANT_LED, LOW);
+      digitalWrite(CLOSE_ANT_LED, LOW);
+    }
+  delay(20);
+}
+
+void Check_Action()
+{
+  actRecv = 0;
   actRecv = LoRa_Read();
   //debug("return: ");
   //debugln((char*)actRecv);
@@ -79,30 +94,23 @@ void loop()
     debugln("LoRa RECV: OPEN_ACK");
     Set_Open_LED();
   }
-  else if (strcmp((char*)actRecv , "CLOSE_ACK") == 0)
+  else if (strcmp((char*)actRecv , "CLOS_ACK") == 0)
   {
-    debugln("LoRa RECV: CLOSE_ACK");
+    debugln("LoRa RECV: CLOS_ACK");
     Set_Close_LED();
   }
-  
-  if (prevMillis != 0)
-    if (prevMillis - millis() >= 10000)
-    {
-      prevMillis = 0;
-      digitalWrite(OPEN_ANT_LED, LOW);
-      digitalWrite(CLOSE_ANT_LED, LOW);
-    }
-  delay(20);
 }
 
 void Set_Open_LED()
 {
+  debugln("OPEN LED: ON");
   prevMillis = millis();
   digitalWrite(OPEN_ANT_LED, HIGH);
 }
 
 void Set_Close_LED()
 {
+  debugln("CLOSE LED: ON");
   prevMillis = millis();
   digitalWrite(CLOSE_ANT_LED, HIGH);
 }

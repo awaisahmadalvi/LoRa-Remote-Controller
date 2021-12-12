@@ -32,6 +32,8 @@ int LoRa_Send(uint8_t * data)
     
     debug("Sending: ");
     debug((char*)data);
+    debug(" : to: 0x");
+    debug(VEHICLE_ADDRESS,0);
     debug(" : ");
     debugln(sizeof(data) * 2);
 
