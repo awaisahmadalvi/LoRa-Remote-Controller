@@ -3,19 +3,25 @@
 
 #define DEBUG_ENABLE
 
-byte BUILTIN_LED = 13;
+#define VBATPIN A7    // 9
 
-byte OPEN_ANT_LED = 14;
-byte CLOSE_ANT_LED = 15;
-
-byte OPEN_ANT_BTN = 6;  //check available pin
 byte CLOSE_ANT_BTN = 5;
+byte OPEN_ANT_BTN = 6;  //check available pin
 
 byte RED_BTN = 10;
 byte GRN_BTN = 11;
 byte BLU_BTN = 12;
 
+byte BUILTIN_LED = 13;
+
+byte OPEN_ANT_LED = 14;
+byte CLOSE_ANT_LED = 15;
+
+byte REMOTE_BAT_LED = 18;
+byte VEHICLE_BAT_LED = 19;
+
 bool IN_ISR = false;
+bool getRemBattery = false;
 
 uint8_t * actSend, * actRecv;
 char OPEN_ACT[] = "ANT_OPEN";
@@ -24,7 +30,7 @@ uint8_t R__[] = "R++";
 uint8_t G__[] = "G++";
 uint8_t B__[] = "B++";
 
-unsigned long prevMillis;
+unsigned long prevMillis, prevMilBat;
 
 void setup()
 {
@@ -64,6 +70,7 @@ void loop()
   if (IN_ISR)
   {
     LoRa_Send(actSend);
+    dispBattery();
     IN_ISR = false;
   }
 
@@ -72,11 +79,20 @@ void loop()
   if (prevMillis != 0)
     if (millis() - prevMillis >= 10000)
     {
-      debugln("powering off LEDs");
+      debugln("powering off Antenna LEDs");
       prevMillis = 0;
       digitalWrite(OPEN_ANT_LED, LOW);
       digitalWrite(CLOSE_ANT_LED, LOW);
     }
+  if (prevMilBat != 0)
+    if (millis() - prevMilBat >= 5000)
+    {
+      debugln("powering off Battery LEDs");
+      prevMilBat  = 0;
+      digitalWrite(VEHICLE_BAT_LED, LOW);
+      digitalWrite(REMOTE_BAT_LED, LOW);
+    }
+
   delay(20);
 }
 
@@ -89,16 +105,32 @@ void Check_Action()
 
   if (strcmp((char*)actRecv , "") == 0)
     return;
-  else if (strcmp((char*)actRecv , "OPEN_ACK") == 0)
+  else if (strcmp((char*)actRecv , "OPN_ACK1") == 0)
   {
     debugln("LoRa RECV: OPEN_ACK");
     Set_Open_LED();
+    getRemBattery = true;
   }
-  else if (strcmp((char*)actRecv , "CLOS_ACK") == 0)
+  else if (strcmp((char*)actRecv , "OPN_ACK0") == 0)
+  {
+    debugln("LoRa RECV: OPEN_ACK");
+    Set_Open_LED();
+    getRemBattery = false;
+  }
+  else if (strcmp((char*)actRecv , "CLS_ACK1") == 0)
   {
     debugln("LoRa RECV: CLOS_ACK");
     Set_Close_LED();
+    getRemBattery = true;
   }
+  else if (strcmp((char*)actRecv , "CLS_ACK0") == 0)
+  {
+    debugln("LoRa RECV: CLOS_ACK");
+    Set_Close_LED();
+    getRemBattery = false;
+  }
+  if (getRemBattery)
+    dispBattery();
 }
 
 void Set_Open_LED()
@@ -173,4 +205,28 @@ void BLU_Btn_Send()
   actSend = (uint8_t *)B__;
   digitalWrite(BUILTIN_LED, HIGH);
   debugln("BLU_Btn_Send_EXIT");
+}
+
+void dispBattery()
+{
+  debugln("Powering Battery LEDs");
+  prevMilBat = millis();
+  if (getBattery)
+    digitalWrite(REMOTE_BAT_LED, HIGH);
+  if (getRemBattery)
+    digitalWrite(VEHICLE_BAT_LED, HIGH);
+}
+
+bool getBattery()
+{
+  float measuredvbat = analogRead(VBATPIN);
+  /*measuredvbat *= 2;    // we divided by 2, so multiply back
+    measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+    measuredvbat /= 1024; // convert to voltage
+    debug("VBat: " ); debugln(measuredvbat);
+  */
+  measuredvbat = map(measuredvbat, 465, 650, 0, 100);
+  debug("VBat A: " ); debugln(measuredvbat);
+  debug("VBat %: " ); debugln(measuredvbat);
+  return measuredvbat < 20 ? true : false;
 }

@@ -1,17 +1,16 @@
 #include "LoRa.h"
 #include "debug.h"
 #include "Ultrasonic.h"
+#include "neo.h"
 
 #define DEBUG_ENABLE
+
+#define VBATPIN A7    // 9
 
 //Ultrasonic sensor
 #define ANT_OPEN_TIME 7500
 #define ANT_HEIGHT 140
 int distance = 0;
-
-#define RED_PIN         5
-#define GRN_PIN         6
-#define BLU_PIN         9
 
 //const int TRIG_PIN = 10; // Trigger Pin of Ultrasonic Sensor
 //const int ECHO_PIN = 11; // Echo Pin of Ultrasonic Sensor
@@ -52,10 +51,6 @@ void setup()
 
   pinMode(ANT_MTR_1, OUTPUT);
   pinMode(ANT_MTR_2, OUTPUT);
-
-  pinMode(RED_PIN, OUTPUT);
-  pinMode(GRN_PIN, OUTPUT);
-  pinMode(BLU_PIN, OUTPUT);
 }
 
 void loop()
@@ -76,12 +71,12 @@ void Check_Action()
   else if (strcmp((char*)actRecv, "ANT_OPEN") == 0)
   {
     debugln("LoRa RECV: ANT_OPEN");
-    Uncoil_Antenna();
+    Open_Antenna();
   }
   else if (strcmp((char*)actRecv, "ANT_CLOS") == 0)
   {
     debugln("LoRa RECV: ANT_CLOS");
-    Coil_Antenna();
+    Close_Antenna();
   }
   else if (strcmp((char*)actRecv, "R++") == 0)
   {
@@ -94,19 +89,19 @@ void Check_Action()
   {
     debugln("LoRa RECV: Green PWM Increment");
     // Increment Green by 64
-    RED_PWM = (GRN_PWM + 64) % 256;
+    GRN_PWM = (GRN_PWM + 64) % 256;
     RGB_ON();
   }
   else if (strcmp((char*)actRecv, "B++") == 0)
   {
     debugln("LoRa RECV: Blue PWM Increment");
     // Increment Blue by 64
-    RED_PWM = (BLU_PWM + 64) % 256;
+    BLU_PWM = (BLU_PWM + 64) % 256;
     RGB_ON();
   }
 }
 
-void Uncoil_Antenna()
+void Open_Antenna()
 {
   //byte close = digitalRead(FOLD_LMT_SW);
   //byte open = digitalRead(UNFOLD_LMT_SW);
@@ -132,7 +127,7 @@ void Uncoil_Antenna()
 
 }
 
-void Coil_Antenna()
+void Close_Antenna()
 {
   //byte close = digitalRead(FOLD_LMT_SW);
   //byte open = digitalRead(UNFOLD_LMT_SW);
@@ -152,22 +147,18 @@ void Coil_Antenna()
 void RGB_ON()
 {
   debug("Powering on LED: ");
-  debug(RED_PWM,0);
+  debug(RED_PWM, 0);
   debug(", ");
-  debug(GRN_PWM,0);
+  debug(GRN_PWM, 0);
   debug(", ");
-  debugln(BLU_PWM,0);
-  analogWrite(RED_PIN, RED_PWM);
-  analogWrite(GRN_PIN, GRN_PWM);
-  analogWrite(BLU_PIN, BLU_PWM);
+  debugln(BLU_PWM, 0);
+  LED_ON(RED_PWM, GRN_PWM, BLU_PWM);
 }
 
 void RGB_OFF()
 {
   debugln("Powering off LED");
-  analogWrite(RED_PIN, 0);
-  analogWrite(GRN_PIN, 0);
-  analogWrite(BLU_PIN, 0);
+  LED_OFF();
 }
 
 void Uncoil_Ant()
@@ -238,7 +229,10 @@ bool Check_Clearance()
 void Open_LoRa_Send()
 {
   debugln("OPEN_ACK_Send");
-  actSend = (uint8_t *) "OPEN_ACK";
+  if ( getBattery())
+    actSend = (uint8_t *) "OPN_ACK1";
+  else
+    actSend = (uint8_t *) "OPN_ACK0";
   LoRa_Send(actSend);
   debugln("OPEN_ACK_Send_EXIT");
 }
@@ -246,7 +240,24 @@ void Open_LoRa_Send()
 void Close_LoRa_Send()
 {
   debugln("CLOS_ACK_Send");
-  actSend = (uint8_t *) "CLOS_ACK";
+
+  if ( getBattery())
+    actSend = (uint8_t *) "CLS_ACK1";
+  else
+    actSend = (uint8_t *) "CLS_ACK0";
+
   LoRa_Send(actSend);
   debugln("CLOS_ACK_Send_EXIT");
+}
+
+bool getBattery()
+{
+  float measuredvbat = analogRead(VBATPIN);
+  /*measuredvbat *= 2;    // we divided by 2, so multiply back
+    measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+    measuredvbat /= 1024; // convert to voltage
+    debug("VBat: " ); debugln(measuredvbat);
+  */
+  measuredvbat = map(measuredvbat, 465, 650, 0, 100);
+  return measuredvbat < 20 ? true : false;
 }
